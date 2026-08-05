@@ -7,6 +7,7 @@ logs/
 # python
 __pycache__/
 *.pyc
+.ruff_cache/
 
 # rclone configuration and credentials live outside this repository
 rclone.conf
