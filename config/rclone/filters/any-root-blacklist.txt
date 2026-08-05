@@ -1,0 +1,74 @@
+# Applies to every job. Listed first. Unrooted patterns only, so it is safe
+# whether the source is a volume root or a subfolder.
+
+# --- Credentials ---
+# Repeated at the top of each allowlist in case a job is ever composed
+# without this file.
+- **/client_secrets.json
+- .ssh/**
+- **/.credentials.json
+
+# --- Files ---
+- *.gguf
+- *.safetensors
+
+# --- Folders: any depth ---
+- Proxy/**
+- $RECYCLE.BIN/**
+- Recycle Bin/**
+
+# --- Application caches ---
+# Excluded for churn, not size: they cost on every run, not just the first.
+- Cache_Data/**
+- Code Cache/**
+- GPUCache/**
+- DiskCache/**
+- ShaderCache/**
+- shader_cache/**
+- Blackmagic Proxy Generator/Support/logs/**
+
+# --- High file-count churn ---
+# File quantity is the constraint, not bytes: these cost checker time and HDD
+# seeks on F:/G: out of proportion to their size.
+- storage/permanent/**
+- datareporting/**
+- saved-telemetry-pings/**
+- Background Tasks Profiles/**
+- security_state/**
+- shader-cache/**
+- crashes/**
+- minidumps/**
+- ComfyUI/logs/**
+- EBWebView/**
+- .affinity/Common/*/locks/**
+
+# --- Regenerable editor state ---
+# Code/User/*.json and snippets/ are kept; only history and workspace state go.
+- Code/User/History/**
+- Code/User/workspaceStorage/**
+
+# --- REAPER stock resources ---
+# Shipped with REAPER and restored by a reinstall. Config, themes and
+# third-party JSFX are untouched.
+- REAPER/Data/toolbar_icons/**
+- REAPER/Data/track_icons/**
+- REAPER/Scripts/Cockos/Default_*_theme_adjuster_images/**
+
+# --- Build caches ---
+- .vs/**
+
+# --- Lock files ---
+# Held open with no sharing mode, so rclone cannot read them, and one
+# unreadable file aborts the entire delete phase of a sync with "not deleting
+# files as there were IO errors". A single open browser silently blocks all
+# cleanup. Not "*.lock" -- that would swallow Cargo.lock.
+- parent.lock
+- .parentlock
+- LOCK
+
+# --- Editor / OS junk ---
+- Thumbs.db
+- desktop.ini
+- .DS_Store
+- *.tmp
+- *.temp

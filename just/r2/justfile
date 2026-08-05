@@ -1,0 +1,541 @@
+# Command layer. Recipes run under git-bash; heavier logic lives in the
+# PowerShell and Python scripts alongside this repository.
+
+set shell := ["D:/dev/git/bin/bash.exe", "-cu"]
+set ignore-comments
+set positional-arguments := true
+
+# lists all recipes alphabetically
+[group('admin')]
+_list:
+	@just --list
+
+# Path to this justfile, for calling sub-recipes
+r2 := "just --justfile D:/code/just/r2/justfile"
+
+red := "\\033[91m"
+green := "\\033[92m"
+yellow := "\\033[93m"
+white := "\\033[97m"
+peach := "\\033[38;5;214m"
+pink := "\\033[38;5;218m"
+reset := "\\033[0m"
+
+# Rclone filter layers, one variable per source volume. ORDER IS LOAD-BEARING:
+# first match wins, so deny layers are listed before any file containing "+"
+# rules. See config/rclone/README.md before editing.
+#
+# F: and G: take identical rules, so one variable serves both destinations.
+
+filter-from_any := "\
+--filter-from 'D:/code/config/rclone/filters/any-root-blacklist.txt'"
+
+filter-from_c := "\
+--filter-from 'D:/code/config/rclone/filters/any-root-blacklist.txt' \
+--filter-from 'D:/code/config/rclone/filters/volume-root-blacklist.txt' \
+--filter-from 'D:/code/config/rclone/filters/c-whitelist.txt'"
+
+filter-from_d := "\
+--filter-from 'D:/code/config/rclone/filters/any-root-blacklist.txt' \
+--filter-from 'D:/code/config/rclone/filters/volume-root-blacklist.txt' \
+--filter-from 'D:/code/config/rclone/filters/d-blacklist.txt' \
+--filter-from 'D:/code/config/rclone/filters/dev-whitelist.txt'"
+
+filter-from_e := "\
+--filter-from 'D:/code/config/rclone/filters/any-root-blacklist.txt' \
+--filter-from 'D:/code/config/rclone/filters/volume-root-blacklist.txt' \
+--filter-from 'D:/code/config/rclone/filters/e-blacklist.txt'"
+
+# Cloud sync flags, rename-tracking variant
+drv-track-renames := "\
+--check-first --modify-window 2s \
+--track-renames --track-renames-strategy modtime,size \
+--delete-after --delete-excluded \
+--transfers 2 --checkers 4 --multi-thread-streams 0"
+
+# Cloud sync flags
+drv-flags := "\
+--check-first --modify-window 2s \
+--delete-after --delete-excluded \
+--transfers 2 --checkers 4 --multi-thread-streams 0"
+
+log := "\
+--log-file D:/code/var/logs/r2-rclone/rclone.log --log-level INFO \
+--log-file-max-size 100M --log-file-max-backups 15 -P"
+
+# rclone			| cmd: sync, copy, move
+[group('rclone:modular')]
+rclone cmd src dest t='4' c='4':
+	@flags=""; \
+	case "{{cmd}}" in \
+		sync) flags="--delete-after --delete-excluded" ;; \
+		copy) flags="" ;; \
+		move) flags="--delete-empty-src-dirs" ;; \
+		*) exit 1 ;; \
+	esac; \
+	rclone {{cmd}} "{{src}}" "{{dest}}" {{filter-from_any}} --check-first $flags --transfers {{t}} --checkers {{c}} {{log}}
+
+# System backup		| C:/ D:/ E:/ -> F:/ G:/
+[group('rclone')]
+sync:
+	@echo "" ; {{r2}} _check-drives F:Fenrir G:Gamma
+
+	@if [ -d "F:/" ]; then \
+		{{r2}} sf ; \
+	fi
+
+	@if [ -d "G:/" ]; then \
+		{{r2}} sg; \
+	fi
+
+	@{{r2}} drv
+
+	@echo "" ; {{r2}} r2-git
+	@{{r2}} _sync-summary
+
+# F:/ backup targets	| C:/ D:/ E:/ -> F:/
+[group('rclone')]
+sf:
+	@echo "" ; echo -e "{{yellow}}C:/ -> F:/{{reset}}"
+	@rclone sync "C:/" "F:/r_arc/c_m2_evo" \
+	--check-first --modify-window 2s --track-renames --track-renames-strategy modtime,size --delete-after --delete-excluded \
+	--transfers 2 --checkers 4 --multi-thread-streams 0 {{filter-from_c}} {{log}}
+
+	@echo "" ; echo -e "{{yellow}}D:/ -> F:/{{reset}}"
+
+	@rclone sync "D:/" "F:/r_arc/d_m2_pro" \
+	--check-first --modify-window 2s --delete-after --delete-excluded \
+	--transfers 2 --checkers 6 --multi-thread-streams 0 {{filter-from_d}} {{log}}
+
+	@echo "" ; echo -e "{{yellow}}E:/ -> F:/{{reset}}"
+
+	@rclone sync "E:/" "F:/r_arc/e_hdd_4tb" \
+	--check-first --modify-window 2s --delete-after --delete-excluded \
+	--transfers 1 --checkers 4 --multi-thread-streams 0 {{filter-from_e}} {{log}}
+
+	@rclone rmdirs "F:/r_arc"
+	@echo "" ; echo -e "(F:) Fenrir	{{green}}Sync Complete{{reset}}"
+
+# G:/ backup targets	| C:/ D:/ E:/ -> G:/
+[group('rclone')]
+sg:
+	@echo "" ; echo -e "{{yellow}}C:/ -> G:/{{reset}}"
+	@rclone sync "C:/" "G:/r_arc/c_m2_evo" \
+	--check-first --modify-window 2s --track-renames --track-renames-strategy modtime,size --delete-after --delete-excluded \
+	--transfers 2 --checkers 4 --multi-thread-streams 0 {{filter-from_c}} {{log}}
+
+	@echo "" ; echo -e "{{yellow}}D:/ -> G:/{{reset}}"
+
+	@rclone sync "D:/" "G:/r_arc/d_m2_pro" \
+	--check-first --modify-window 2s --delete-after --delete-excluded \
+	--transfers 1 --checkers 4 --multi-thread-streams 0 {{filter-from_d}} {{log}}
+
+	@echo "" ; echo -e "{{yellow}}E:/ -> G:/{{reset}}"
+
+	@rclone sync "E:/" "G:/r_arc/e_hdd_4tb" \
+	--check-first --modify-window 2s --delete-after --delete-excluded \
+	--transfers 1 --checkers 4 --multi-thread-streams 0 {{filter-from_e}} {{log}}
+
+	@rclone rmdirs "G:/r_arc"
+
+	@echo "" ; echo -e "(G:) Gamma	{{green}}Sync Complete{{reset}}"
+
+# Cloud backup 	| C:/... + D:/... -> E:/Drive
+[group('rclone')]
+drv:
+	@pwsh -Command 'Write-Host ""' ; pwsh -Command 'Write-Host "C:/... + D:/... -> E:/Drive" -ForegroundColor Yellow'
+	@-pwsh -Command 'Stop-Process -Name ProtonDrive -ErrorAction SilentlyContinue'
+
+	@echo "" ; echo "C:/.../Resolve Project Library"
+	@rclone sync "C:/Users/m-halloran/AppData/Roaming/Blackmagic Design/DaVinci Resolve/Support/Resolve Project Library" "E:/Drive/My files/rclone_sync/Resolve Project Library" \
+	--backup-dir "E:/Drive/My files/rclone_sync/archive-backup/Resolve Project Library" \
+	{{drv-track-renames}} {{filter-from_any}} {{log}}
+
+	@echo "" ; echo "C:/.../VS-Code User Settings"
+	@rclone sync "C:/Users/m-halloran/AppData/Roaming/Code/User" "E:/Drive/My files/rclone_sync/Code/User" \
+	--backup-dir "E:/Drive/My files/rclone_sync/archive-backup/Code/User" \
+	{{drv-track-renames}} {{filter-from_any}} {{log}}
+
+	@echo "" ; echo "C:/.../Windows Terminal"
+	@rclone sync "C:/Users/m-halloran/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState" "E:/Drive/My files/rclone_sync/WindowsTerminal/LocalState" \
+	--backup-dir "E:/Drive/My files/rclone_sync/archive-backup/WindowsTerminal/LocalState" \
+	{{drv-track-renames}} {{filter-from_any}} {{log}}
+
+	@echo "" ; echo "D:/code"
+	@rclone sync "D:/code" "E:/Drive/My files/rclone_sync/code" \
+	--backup-dir "E:/Drive/My files/rclone_sync/archive-backup/code"  \
+	--filter "- *.log" --filter "- av1/**" \
+	{{drv-track-renames}} {{filter-from_any}} {{log}}
+
+	# Content-addressed snapshots of every justfile: a new timestamped copy is
+	# taken only when the SHA-256 hash differs from the latest snapshot, so no
+	# configuration change is ever silently lost and unchanged files cost nothing.
+	@echo "" ; echo "D:/code/justfiles"
+	@backup_root="E:/Drive/My files/rclone_sync/justfile-backups"; \
+	rclone hashsum sha256 "D:/code/just" --include "justfile" | while read -r cur relpath; do \
+		mod=$(basename "$(dirname "$relpath")"); \
+		dest_dir="$backup_root/$mod"; \
+		mkdir -p "$dest_dir"; \
+		latest=$(ls -t "$dest_dir"/justfile_* 2>/dev/null | head -n 1); \
+		if [ -n "$latest" ]; then \
+			prev=$(rclone hashsum sha256 "$latest" | awk '{print $1}'); \
+		else \
+			prev=""; \
+		fi; \
+		if [ -n "$latest" ] && [ "$cur" = "$prev" ]; then \
+			:; \
+		else \
+			stamp=$(date +%Y-%m-%d_%H-%M-%S); \
+			dest="$dest_dir/justfile_$stamp"; \
+			rclone copyto "D:/code/just/$relpath" "$dest" -P; \
+			echo "$mod backup created -> $mod/justfile_$stamp"; \
+		fi; \
+	done
+
+	@echo "" ; echo "D:/Documents/PowerShell"
+	@rclone sync "D:/Documents/PowerShell/Microsoft.PowerShell_profile.ps1" "E:/Drive/My files/rclone_sync/PowerShell/Microsoft.PowerShell_profile.ps1" \
+	--backup-dir "E:/Drive/My files/rclone_sync/archive-backup/PowerShell/Microsoft.PowerShell_profile.ps1" \
+	{{drv-track-renames}} {{filter-from_any}} {{log}}
+
+	@echo "" ; echo "D:/user_files/text_files"
+	@rclone sync "D:/user_files/text_files" "E:/Drive/My files/rclone_sync/text_files" \
+	--backup-dir "E:/Drive/My files/rclone_sync/archive-backup/text_files" \
+	{{drv-track-renames}} {{filter-from_any}} {{log}}
+
+	@echo "" ; echo "E:/Videos/Archive - Completed Projects"
+	@rclone sync "E:/Videos/Archive - Completed Projects" "E:/Drive/My files/rclone_sync/Archive - Completed Projects" \
+	{{drv-flags}} {{filter-from_any}} {{log}}
+
+	@rclone rmdirs "E:/Drive/My files/rclone_sync" --copy-links
+
+# Reconcile file drift: mirrors source layout in DEST via renames. Use -h/--help.
+[group('rclone')]
+drift src='' dest='' *flags:
+	@args=(); \
+	[ -n "{{src}}" ] && args+=("{{src}}"); \
+	[ -n "{{dest}}" ] && args+=("{{dest}}"); \
+	python "D:\code\python\sync_drift.py" "${args[@]}" {{flags}}
+
+# Prompts y/N and halts the caller (exit 1) if any listed drive is disconnected
+[group('rclone')]
+_check-drives *pairs:
+	@echo "Drive Status"; disconnected=""; for p in {{pairs}}; do l=${p%%:*}; n=${p#*:}; \
+	if [ -d "$l:/" ]; then echo -e "($l:) $n\t{{green}}Mounted{{reset}}"; else echo -e "($l:) $n\t{{red}}Disconnected{{reset}}"; \
+	if [ -z "$disconnected" ]; then disconnected="($l:) $n"; else disconnected="$disconnected, ($l:) $n"; fi; fi; done; \
+	if [ -n "$disconnected" ]; then \
+		echo "" ; echo -n -e "{{yellow}}$disconnected disconnected. Continue anyway? (y/N): {{reset}}"; \
+		read -r confirm < /dev/tty; \
+		case "$confirm" in [yY]) ;; *) echo "Sync halted by user." ; exit 1 ;; esac; \
+	fi
+
+# Variant of _check-drives | only prompts when every listed drive is disconnected
+[group('rclone')]
+_check-drives-both *pairs:
+	@echo "Drive Status"; disconnected=""; total=0; down=0; for p in {{pairs}}; do l=${p%%:*}; n=${p#*:}; total=$((total+1)); \
+	if [ -d "$l:/" ]; then echo -e "($l:) $n\t{{green}}Mounted{{reset}}"; else echo -e "($l:) $n\t{{red}}Disconnected{{reset}}"; down=$((down+1)); \
+	if [ -z "$disconnected" ]; then disconnected="($l:) $n"; else disconnected="$disconnected, ($l:) $n"; fi; fi; done; \
+	if [ "$down" -eq "$total" ] && [ "$total" -gt 1 ]; then \
+		echo "" ; echo -n -e "{{yellow}}$disconnected disconnected. Continue anyway? (y/N): {{reset}}"; \
+		read -r confirm < /dev/tty; \
+		case "$confirm" in [yY]) ;; *) echo "Sync halted by user." ; exit 1 ;; esac; \
+	fi
+
+# Prints a summary for the sync command
+[group('rclone')]
+_sync-summary:
+    @mounted=0 ; echo "" ; \
+    if [ -d "F:/" ]; then \
+        echo -e "(F:) Fenrir	{{green}}Complete{{reset}}"; \
+        mounted=$((mounted + 1)); \
+    else \
+        echo -e "(F:) Fenrir	{{red}}Failed{{reset}}"; \
+    fi ; \
+    if [ -d "G:/" ]; then \
+        echo -e "(G:) Gamma	{{green}}Complete{{reset}}"; \
+        mounted=$((mounted + 1)); \
+    else \
+        echo -e "(G:) Gamma	{{red}}Failed{{reset}}"; \
+    fi ; \
+        echo "" ; \
+    if [ "$mounted" -eq 2 ]; then \
+        echo -e "Backup Summary	{{green}}Nominal{{reset}}" ; \
+    elif [ "$mounted" -eq 1 ]; then \
+        echo -e "Backup Summary	{{peach}}Partial{{reset}}" ; \
+    else \
+        echo -e "Backup Summary	{{red}}Minimal{{reset}}" ; \
+    fi
+
+# Convert input to av1		| encode -> retime -> compare frames
+[group('av1an')]
+av1 input c='20' p='4' w="4":
+	@echo "" ; echo -e "{{yellow}}Parameters: preset: {{p}}, crf: {{c}}, workers: {{w}}.{{reset}}" ; echo ""
+	@{{r2}} _av1-encode "{{input}}" {{c}} {{p}} {{w}}
+	@{{r2}} _av1-retime "{{input}}" c{{c}} {{p}}
+	@{{r2}} _av1-frames "{{input}}" c{{c}} {{p}}
+	@echo -e "{{green}}av1 complete{{reset}}"
+
+# Step 1: av1an encode to a .tmp.mp4 (timing not corrected yet)
+[group('av1an')]
+_av1-encode input c p w:
+	@cd "D:\dev\av1an\media" ; var1="{{input}}" ; \
+	av1an -i "{{input}}" -o "${var1%.*}_p{{p}}_c{{c}}_av1.tmp.mp4" --chunk-method bestsource --cache-mode temp --pix-format yuv420p10le \
+	--video-params "--preset {{p}} --crf {{c}} --keyint 240 --scd 1 --tune 0" \
+	--verbose -w {{w}}
+
+# Step 2: stamp the source's real frame timings onto the encode (fixes VFR speed drift), then add source metadata
+[group('av1an')]
+_av1-retime input tag p:
+	@pwsh -NoProfile -Command ' \
+		$src  = "{{input}}"; \
+		$dot = $src.LastIndexOf("."); $base = if ($dot -ge 0) { $src.Substring(0, $dot) } else { $src }; \
+		$tmp  = "${base}_p{{p}}_{{tag}}_av1.tmp.mp4"; \
+		$mkv  = "${base}_p{{p}}_{{tag}}_av1.tmp.mkv"; \
+		$tc   = "${base}_p{{p}}_{{tag}}_timecodes.txt"; \
+		$out  = "${base}_p{{p}}_{{tag}}_av1.mp4"; \
+		Write-Host " "; \
+		Write-Host "Reading frame timestamps from source..." -ForegroundColor Yellow; \
+		$pts = ffprobe -v error -select_streams v:0 -show_entries packet=pts_time -of csv=p=0 $src \
+			| Where-Object { $_ -match "[0-9]" } | ForEach-Object { [double]$_ } | Sort-Object; \
+		$frames = [int](ffprobe -v error -select_streams v:0 -count_packets -show_entries stream=nb_read_packets -of csv=p=0 $tmp); \
+		if ($pts.Count -ne $frames) { Write-Host "ABORT: frame mismatch. source=$($pts.Count) encode=$frames. Encode kept at $tmp" -ForegroundColor Red; exit 1 }; \
+		$t0 = $pts[0]; \
+		$lines = ,"# timestamp format v2" + ($pts | ForEach-Object { "{0:F6}" -f (($_ - $t0) * 1000) }); \
+		Set-Content -Path $tc -Value $lines -Encoding ascii; \
+		mkvmerge -o $mkv --timestamps "0:$tc" $tmp; \
+		if ($LASTEXITCODE -ne 0) { Write-Host "ABORT: mkvmerge failed. Encode kept at $tmp" -ForegroundColor Red; exit 1 }; \
+		ffmpeg -y -v error -i $mkv -i $src -map 0 -map_metadata 1 -movflags use_metadata_tags -c copy $out; \
+		if ($LASTEXITCODE -ne 0) { Write-Host "ABORT: final mux failed. Encode kept at $tmp" -ForegroundColor Red; exit 1 }; \
+		Remove-Item $tmp, $mkv, $tc; \
+		Write-Host "Timing corrected: $out" -ForegroundColor Green \
+	'
+
+# Step 3: capture one comparison frame from source + output at the halfway point, saved next to the output
+[group('av1an')]
+_av1-frames input tag p:
+	@pwsh -NoProfile -Command ' \
+		$src  = "{{input}}"; \
+		$dot = $src.LastIndexOf("."); $base = if ($dot -ge 0) { $src.Substring(0, $dot) } else { $src }; \
+		$out  = "${base}_p{{p}}_{{tag}}_av1.mp4"; \
+		{{r2}} compare $src $out "50%" \
+	'
+
+# Recommends CRF for a target VMAF from sample clips, and estimates full-encode time
+[group('av1an')]
+av1-crf input p='3' tq='95' pr='6' s='3':
+	@pwsh -NoProfile -File "D:\code\pwsh\Measure-Av1Crf.ps1" -InputFile "{{input}}" -Preset {{p}} -Tq {{tq}} -Probes {{pr}} -Samples {{s}}
+
+# av1 target-quality variant	| VMAF 90, crf search bounded 10-25
+[group('av1an')]
+av1-q input q='90' qp='10-25' p='3' w="4":
+	@echo "" ; echo -e "{{yellow}}Target quality - preset: {{p}}, VMAF: {{q}}, qp {{qp}}, workers: {{w}}.{{reset}}" ; echo ""
+	@{{r2}} _av1-encode-tq "{{input}}" {{q}} {{qp}} {{p}} {{w}}
+	@{{r2}} _av1-retime "{{input}}" tq{{q}} {{p}}
+	@{{r2}} _av1-frames "{{input}}" tq{{q}} {{p}}
+	@echo -e "{{green}}av1-tq complete{{reset}}"
+
+# Step 1 (target-quality): av1an searches CRF to hit VMAF {{q}}, bounded by qp {{qp}}
+[group('av1an')]
+_av1-encode-tq input q qp p w:
+	@cd "D:\dev\av1an\media" ; var1="{{input}}" ; \
+	av1an -i "{{input}}" -o "${var1%.*}_p{{p}}_tq{{q}}_av1.tmp.mp4" --chunk-method bestsource --cache-mode temp --pix-format yuv420p10le \
+	--target-quality {{q}} --qp-range {{qp}} \
+	--video-params "--preset {{p}} --keyint 240 --scd 1 --tune 0" \
+	--verbose -w {{w}}
+
+# av1/av1-r resume variant	| Requires identical inputs. Functions via cache-mode temp
+[group('av1an')]
+av1-r input c='20' p='4' w="4":
+	@echo "" ; echo -e "{{yellow}}Resume - preset: {{p}}, crf: {{c}}, workers: {{w}}.{{reset}}" ; echo ""
+	@{{r2}} _av1-encode-r "{{input}}" {{c}} {{p}} {{w}}
+	@{{r2}} _av1-retime "{{input}}" c{{c}} {{p}}
+	@{{r2}} _av1-frames "{{input}}" c{{c}} {{p}}
+	@echo -e "{{green}}av1-r complete{{reset}}"
+
+# Step 1 (resume): re-run av1an with --resume; cache-mode temp state picks up finished chunks
+[group('av1an')]
+_av1-encode-r input c p w:
+	@cd "D:\dev\av1an\media" ; var1="{{input}}" ; \
+	av1an -i "{{input}}" -o "${var1%.*}_p{{p}}_c{{c}}_av1.tmp.mp4" --chunk-method bestsource --cache-mode temp --pix-format yuv420p10le --resume \
+	--video-params "--preset {{p}} --crf {{c}} --keyint 240 --scd 1 --tune 0" \
+	--verbose -w {{w}}
+
+# Compare frames			| seconds/percent, "10% 50% 90%" or "600 1800"
+[group('av1an')]
+compare src enc pos="25% 50% 75%":
+	cd "D:\dev\av1an\media" ; \
+	src="{{src}}" ; enc="{{enc}}" ; base="${enc%.*}" ; \
+	dur=$(ffprobe -v error -show_entries "format=duration" -of csv=p=0 "$src" | tr -d '\r') ; \
+	vs=$(ffprobe -v error -select_streams v:0 -show_entries "stream=start_time" -of csv=p=0 "$src" | tr -d '\r') ; \
+	fs=$(ffprobe -v error -show_entries "format=start_time" -of csv=p=0 "$src" | tr -d '\r') ; \
+	case "$vs" in ''|N/A) vs=0 ;; esac ; case "$fs" in ''|N/A) fs=0 ;; esac ; \
+	for t in {{pos}} ; do \
+		case "$t" in \
+		*%) T=$(awk -v d="$dur" -v p="${t%\%}" 'BEGIN{printf "%.3f", d*p/100}') ;; \
+		*) T=$t ;; \
+		esac ; \
+		Ts=$(awk -v m="$T" -v v="$vs" -v f="$fs" 'BEGIN{printf "%.3f", m+v-f}') ; \
+		ffmpeg -y -v error -ss "$Ts" -i "$src" -frames:v 1 "${base}_${T}s_src.png" ; \
+		ffmpeg -y -v error -ss "$T" -i "$enc" -frames:v 1 "${base}_${T}s_enc.png" ; \
+		echo "@ ${T}s: ${base}_${T}s_src.png vs _enc.png" ; \
+	done
+
+# Variable Framerate Check	| VFR fraction + drift verdict. Full decode, ETA 3-5min
+[group('av1an')]
+check-vfr input:
+	@ffmpeg -i "{{input}}" -vf vfrdet -an -f null - 2>&1 | grep -oE "VFR:[0-9.]+ \([0-9]+/[0-9]+\).*" ; \
+	ffprobe -v error -select_streams v:0 -show_entries "stream=r_frame_rate,avg_frame_rate" -of csv=p=0 "{{input}}" | \
+	awk -F'[,/]' '{ if ($2==0 || $4==0) { print "VERDICT: cannot compute (missing rate)"; exit } ; \
+	r=$1/$2; a=$3/$4; d=(r-a)/a*100; if (d<0) d=-d; \
+	printf "nominal %.3f fps | average %.3f fps | drift %.2f%%\n", r, a, d; \
+	if (d < 0.01) print "VERDICT: SAFE for av1an"; \
+	else printf "VERDICT: DRIFT %.2f%% — av1an output will play off-speed; use ffav1 or vfr-rescue\n", d }'
+
+# av1.mp4 via ffmpeg+SVT-AV1	| VFR-safe, single process, timestamps preserved
+[group('ffmpeg')]
+ffav1 input c='20' p='4':
+	cd "D:\dev\av1an\media" ; var1="{{input}}" ; \
+	ffmpeg -i "{{input}}" -c:v libsvtav1 -preset {{p}} -crf {{c}} \
+	-svtav1-params "keyint=240:tune=0" -pix_fmt yuv420p10le \
+	-fps_mode passthrough -c:a copy -map_metadata 0 -movflags use_metadata_tags \
+	"${var1%.*}_p{{p}}_c{{c}}_ffav1.mp4"
+
+# Lossy-convert all images to AVIF	| -s 0 best, -q 67 lossy, good middle-ground
+[group('image')]
+avif dir:
+	find "{{dir}}" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \
+		-o -iname "*.webp" -o -iname "*.tif" -o -iname "*.tiff" -o -iname "*.bmp" \) -print0 | \
+	while IFS= read -r -d '' f; do \
+		out="${f%.*}.avif" ; \
+		echo "avifenc: $f -> $out" ; \
+		avifenc -s 0 -q 67 --yuv 444 "$f" "$out" ; \
+	done
+
+# image -> multi-resolution .ico for Windows Explorer thumbnails (full 256->16 range)
+[group('image')]
+ico input:
+	var1="{{input}}" ; \
+	if [ ! -f "$var1" ]; then echo -e "{{red}}No such file: $var1{{reset}}" >&2 ; exit 1 ; fi ; \
+	if magick "$var1" -background none -define icon:auto-resize=256,128,96,64,48,32,16 "${var1%.*}.ico" ; then \
+		echo -e "{{green}}Icon written to ${var1%.*}.ico{{reset}}" ; \
+	else \
+		echo -e "{{red}}Conversion failed for $var1{{reset}}" >&2 ; exit 1 ; \
+	fi
+
+# Losslessly convert all PNGs to JXL | -d 0 lossless, -e 9 max effort
+[group('image')]
+jxl dir ext='jpg':
+	@tmp=$(mktemp) ; \
+	trap 'rm -f "$tmp"' EXIT ; \
+	find "{{dir}}" -type f -iname "*.{{ext}}" -print0 > "$tmp" ; \
+	total=0 ; \
+	while IFS= read -r -d '' f; do \
+		out="${f%.*}.jxl" ; \
+		{ [ -e "$out" ] && [ "$out" -nt "$f" ] ; } || total=$((total+1)) ; \
+	done < "$tmp" ; \
+	n=0 ; \
+	while IFS= read -r -d '' f; do \
+		out="${f%.*}.jxl" ; \
+		if [ -e "$out" ] && [ "$out" -nt "$f" ]; then \
+			echo "skip (up to date): $f" ; \
+			continue ; \
+		fi ; \
+		n=$((n+1)) ; \
+		echo "[$n/$total] cjxl: $f -> $out" ; \
+		cjxl "$f" "$out" -d 0 -e 9 ; \
+	done < "$tmp" ; \
+	echo -e "{{yellow}}Done: $n converted.{{reset}}"
+
+# Prints + logs a recursive index of a directory
+[group('scripts')]
+index dir:
+    @pwsh -NoProfile -File "D:\code\pwsh\Get-Index.ps1" "{{dir}}"
+    @echo -e '{{yellow}}Index created and logged at D:/code/var/logs/r2-index{{reset}}'
+
+# Moves all files in a directory by file extension | No quotes in paths | UI
+[group('scripts')]
+py-move:
+	python "D:/code/python/collect_files.py"
+
+# Prints file characteristics
+[group('help:info')]
+info input:
+	@ffprobe -hide_banner "{{input}}"
+
+# Information on system drives 	| Logical + physical disks with live I/O
+[group('help:info')]
+drive-info:
+	@pwsh -NoProfile -Command '& "D:\code\pwsh\Get-SystemSpecs.ps1" -DrivesOnly'
+
+# Print relevant system info	| Includes drive info
+[group('help:info')]
+system-info:
+	@pwsh -NoProfile -Command '& "D:\code\pwsh\Get-SystemSpecs.ps1"'
+
+# Reports codec/res/fps/bitrate for media at target dir
+[group('help:info')]
+media-info dir:
+	python "D:\code\python\media_info.py" "{{dir}}"
+
+# Find the location for a given command on path
+[group('help')]
+find command:
+	@pwsh -NoProfile -Command 'Get-Command {{command}} | Select-Object -ExpandProperty Source'
+
+# Delete residual proxy files at target directory | Search criteria '*/Proxy/*.mov'
+[group('system')]
+proxy dir='E:/Gaming':
+	@found_count=0; \
+	targets=(); \
+	missing_masters=(); \
+	while IFS= read -r -d '' proxy_file; do \
+		parent_dir=$(dirname "$(dirname "$proxy_file")"); \
+		filename_no_ext=$(basename "$proxy_file" .mov); \
+		master_file="$parent_dir/$filename_no_ext.mp4"; \
+		if [[ ! -f "$master_file" ]]; then \
+			targets+=("$proxy_file"); \
+			missing_masters+=("$filename_no_ext.mp4"); \
+			((found_count++)); \
+		fi; \
+	done < <(find -L "{{dir}}" -type f -path "*/Proxy/*.mov" -print0); \
+	\
+	if [ "$found_count" -eq 0 ]; then \
+		echo -e "{{green}}Scan complete. All proxy files have matching masters. Nothing to delete.{{reset}}"; \
+	else \
+		echo -e "{{yellow}}Found $found_count orphaned proxy file(s):{{reset}}"; \
+		for i in "${!targets[@]}"; do \
+			echo "  - ${targets[$i]}"; \
+			echo "    [Master missing: ${missing_masters[$i]}]"; \
+		done; \
+		\
+		echo -n -e "{{red}}Permanently delete these files? (y/N): {{reset}}"; \
+		read -r confirm < /dev/tty; \
+		if [[ "$confirm" == [yY] ]]; then \
+			for file in "${targets[@]}"; do \
+				echo "Deleting: $file"; \
+				rm "$file"; \
+			done; \
+			echo -e "{{green}}Cleanup complete{{reset}}"; \
+		else \
+			echo "Operation cancelled by user."; \
+		fi; \
+	fi
+
+# Commit this justfile if it changed	| snapshots history in D:\code\just\r2\.git
+[group('system')]
+r2-git msg='':
+	@cd "D:\code\just\r2" ; \
+	git add justfile ; \
+	if git diff --cached --quiet ; then \
+		echo -e "{{green}}justfile unchanged, nothing to commit{{reset}}" ; \
+	else \
+		stamp=$(date +%Y-%m-%d_%H-%M-%S) ; \
+		msg="{{msg}}" ; \
+		if [ -z "$msg" ]; then msg="Update justfile ($stamp)" ; fi ; \
+		git commit -q -m "$msg" ; \
+		echo -e "{{green}}Committed: $msg{{reset}}" ; \
+	fi
+
+# Open all rclone filter files
+[group('system')]
+ex:
+	@pwsh -Command 'code (ls "D:\code\config\rclone\filters\*.txt")'

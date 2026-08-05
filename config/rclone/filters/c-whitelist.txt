@@ -1,0 +1,44 @@
+# Allowlist for C:/. Listed last. Rooted at the volume root.
+#
+# Allowlist rather than denylist because this is the OS volume: Windows and its
+# installers create directories here constantly, so a denylist would back up
+# anything new by default and you would find out when F: and G: filled up. This
+# way a new application is missed until it is added, which is the cheaper
+# failure. The trailing "- **" also keeps rclone out of /Windows and
+# /Program Files entirely rather than walking them.
+
+# --- Hard denies: must outrank every "+" rule below ---
+- **/client_secrets.json
+- .ssh/**
+- **/.credentials.json
+
+# --- Top-level targets ---
++ /Icons/**
++ /Videos/**
+
+# --- Browser profiles ---
+# Roaming holds the profile; the matching Local/ dirs are cache and fall
+# through to the "- **".
++ /Users/m-halloran/AppData/Roaming/Mozilla/**
++ /Users/m-halloran/AppData/Roaming/librewolf/**
++ /Users/m-halloran/AppData/Roaming/zen/**
+
+# --- Application settings ---
++ /Users/m-halloran/AppData/Roaming/Blackmagic Design/**
++ /Users/m-halloran/AppData/Roaming/Code/User/**
++ /Users/m-halloran/AppData/Roaming/REAPER/**
++ /Users/m-halloran/AppData/Roaming/ComfyUI/**
++ /Users/m-halloran/AppData/Roaming/Comfy Desktop/**
++ /Users/m-halloran/.affinity/**
++ /Users/m-halloran/.config/**
++ /Users/m-halloran/AppData/Local/Everything/*.ini
++ /Users/m-halloran/AppData/Local/Packages/Canva.Affinity_*/**
+
+# --- Terminal ---
++ /Users/m-halloran/AppData/Local/Packages/Microsoft.WindowsTerminal_*/LocalState/**
+
+# --- Everything else on C:/ ---
+# Game saves are covered by Steam Cloud and a separate manual backup, so they
+# are left to this rule along with the profile caches, other user profiles,
+# the legacy junctions and the OS itself.
+- **

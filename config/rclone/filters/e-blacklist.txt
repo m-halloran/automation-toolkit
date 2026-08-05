@@ -1,0 +1,21 @@
+# Denies rooted at E:/. Volume-root source only.
+
+# --- Encrypted volumes ---
+- /archive/volume_archive/**
+- /volume_archive/**
+
+# --- Folders ---
+- /Drive/**
+- /Gaming/**
+- /game_files/**
+- /r_arc/**
+- /u_arc/**
+- /Laptop backup/**
+- /tmp/**
+- /dev/av1an/media/**
+- /TV Series/**
+- /Movies/**
+- /Videos/**
+
+# --- Files ---
+- /bootTel.dat

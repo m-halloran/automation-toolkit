@@ -1,0 +1,30 @@
+# Illustrative, not a captured run. Paths are stand-ins; the line formats and
+# the summary block are exactly what rclone emits under the flags in `sf`.
+
+# --- dry run: every delete is identified and none performed -------------------
+2026/08/05 21:14:02 NOTICE: code/var/logs/r2-index/index_0007_media.txt: Skipped delete as --dry-run is set (size 44.108Ki)
+2026/08/05 21:14:02 NOTICE: dev/toolchain/share/locale/fr/LC_MESSAGES/app.mo: Skipped delete as --dry-run is set (size 447)
+2026/08/05 21:14:02 NOTICE: media/working/scratch/render_0142.tmp: Skipped delete as --dry-run is set (size 271Ki)
+
+Transferred:   	          0 B / 0 B, -, 0 B/s, ETA -
+Checks:            131082 / 131082, 100%, Listed 534486
+Elapsed time:        11.7s
+
+# --- real run: --check-first scans, --delete-after removes only once copying --
+# --- has succeeded, so an interrupted run never leaves the destination worse --
+2026/08/05 21:31:55 INFO  : code/just/r2/justfile: Copied (replaced existing)
+2026/08/05 21:31:55 INFO  : media/archive/2026-07/session_04.mkv: Copied (new)
+2026/08/05 21:33:10 INFO  : media/working/scratch/render_0142.tmp: Deleted
+
+Transferred:   	   18.402 GiB / 18.402 GiB, 100%, 71.240 MiB/s, ETA 0s
+Checks:             48117 / 48117, 100%, Listed 96234
+Deleted:              214 (files), 6 (dirs), 1.887 GiB (freed)
+Transferred:          338 / 338, 100%
+Elapsed time:     4m24.6s
+
+# --- rename-tracked leg: --track-renames moves files server-side rather than --
+# --- re-transferring them, which is why Transferred is 0 B against 37 Renamed -
+Transferred:   	          0 B / 0 B, -, 0 B/s, ETA -
+Checks:                37 / 37, 100%, Listed 37
+Renamed:               37
+Elapsed time:         2.1s

@@ -1,0 +1,19 @@
+# Rooted patterns. Pair only with a volume-root source (C:/ D:/ E:/); against a
+# subfolder source every rule here is dead.
+
+# --- Windows system artifacts ---
+- /System Volume Information/**
+
+# --- NTFS metadata ---
+- /$Extend/**
+- /$LogFile
+- /$MFT
+- /$Volume
+- /$Bitmap
+- /$Boot
+- /$AttrDef
+- /$BadClus
+- /pagefile.sys
+- /hiberfil.sys
+- /swapfile.sys
+- /DumpStack.log.tmp

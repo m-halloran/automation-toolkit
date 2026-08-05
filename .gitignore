@@ -1,0 +1,20 @@
+# runtime output -- created on demand, never tracked.
+# examples/ is documentation, not output, so it is exempt.
+logs/
+*.log
+!examples/*.log
+
+# python
+__pycache__/
+*.pyc
+
+# rclone configuration and credentials live outside this repository
+rclone.conf
+*.token
+client_secrets.json
+
+# editor / OS noise
+.vscode/
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,49 @@
+# Allowlist for D:/dev. Listed last, after d-blacklist.txt.
+#
+# D:/dev is manually-managed tool binaries, nearly all re-downloadable, so it
+# is denied wholesale at the bottom and the "+" rules rescue the paths holding
+# real settings. Version numbers are globbed on purpose: a literal
+# "librewolf-149.0-1" stops matching the day you update, and fails silently in
+# the dangerous direction.
+
+# --- Hard denies: must outrank every "+" rule below ---
+- **/client_secrets.json
+
+# --- Application settings / profiles ---
++ /dev/foobar2000/profile/**
++ /dev/Equalizer-APO/config/**
++ /dev/FanControl/*/Configurations/**
++ /dev/Resolve/config6/**
++ /dev/dupeguru/settings.ini
++ /dev/Reaper/reaper-install.ini
++ /dev/lslib/settings.json
+
+# --- Tool configs ---
++ /dev/gallery-dl/**.conf
++ /dev/yt-dlp/yt-dlp.conf
++ /dev/HWiNFO64/HWiNFO64.INI
++ /dev/CrystalDiskInfo/DiskInfo.ini
++ /dev/bulk_rename_utility/*.ini
++ /dev/filetypesman/*.cfg
++ /dev/shmnview (context menu editor)/*.cfg
++ /dev/mkvtoolnix/*/mkvtoolnix-gui.ini
++ /dev/pdfarranger/*/config.ini
++ /dev/Rufus (USB ISO Writer)/rufus.ini
++ /dev/ventoy*/*/Ventoy2Disk.ini
+
+# --- Not practically re-downloadable ---
+# Self-compiled: upstream ships source only. Recovering bin/Release/ means
+# reinstalling a .NET 7 SDK and rebuilding, so source and .git ride along.
+- /dev/fastfile_extractor/obj/**
++ /dev/fastfile_extractor/**
+
+# Precompiled but hard to source: re-finding a matching build is the expensive
+# part, not the download.
++ /dev/libavif/**
++ /dev/SVT-AV1/**
+
+# av1an binary only; /dev/av1an/media is disposable encode staging.
++ /dev/av1an/bin/**
+
+# --- Everything else under D:/dev is re-downloadable ---
+- /dev/**

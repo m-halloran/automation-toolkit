@@ -1,0 +1,15 @@
+# Denies rooted at D:/. Volume-root source only.
+#
+# Everything not listed here is backed up. D:/dev is handled by
+# dev-whitelist.txt, which is listed after this file.
+
+# --- Folders ---
+- /data/**
+- /Documents/ComfyUI/models/**
+- /Documents/ComfyUI/.venv/**
+- /Games/**
+- /tmp/**
+- /Scratch/**
+
+# --- Files ---
+- /bootTel.dat

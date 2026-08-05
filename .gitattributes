@@ -1,0 +1,11 @@
+# Normalise line endings in the repository, check out native on each platform.
+# Without this, editing a .ps1 on Windows produces whole-file diffs that hide
+# the real change.
+* text=auto eol=lf
+
+# PowerShell is checked out CRLF: some hosts still mis-handle LF-only .ps1.
+*.ps1 text eol=crlf
+
+# Rule files are consumed by rclone on Windows; keep them stable and LF.
+*.txt text eol=lf
+justfile text eol=lf
