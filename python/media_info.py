@@ -40,8 +40,7 @@ def find_ffprobe() -> str:
         sys.exit(
             "ERROR: ffprobe not found on PATH.\n"
             "Install ffmpeg: https://ffmpeg.org/download.html\n"
-            "  Windows: winget install Gyan.FFmpeg   (or: choco install ffmpeg)\n"
-            "  Arch:    sudo pacman -S ffmpeg"
+            "  Windows: winget install Gyan.FFmpeg"
         )
     return exe
 
